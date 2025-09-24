@@ -1,0 +1,268 @@
+{
+  "name": "Daily DevSecOps Content \u2192 Image \u2192 Buffer",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 9,
+              "minute": 0
+            }
+          ],
+          "timezone": "America/Los_Angeles"
+        }
+      },
+      "id": "Cron_Trigger",
+      "name": "Cron (Daily 09:00 PT)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "functionCode": "const topics = [\n  \"CCNA fundamentals\",\n  \"Subnetting drills\",\n  \"Routing vs Switching\",\n  \"Troubleshooting playbook\",\n  \"Network security basics\",\n  \"VLANs & trunking\",\n  \"NAT vs PAT\",\n  \"OSPF vs EIGRP basics\",\n  \"Wireless basics (RSSI/SNR)\",\n  \"Packet captures 101\"\n];\nconst idx = (new Date().getDate()) % topics.length;\nreturn [{ json: { topic: topics[idx] }}];"
+      },
+      "id": "Pick_Topic",
+      "name": "Pick Topic",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "model": "gpt-5",
+        "systemMessage": "You are an elite content strategist. Always return valid minified JSON (no markdown, no explanations).",
+        "messages": "USER: Generate one content pack around the topic: {{$json.topic}}.\\nReturn STRICT JSON with this shape:\\n{\\n  \\\"title\\\": string,\\n  \\\"linkedin\\\": string, // 150-250 words, educational, approachable\\n  \\\"twitter\\\": string,  // <= 280 chars\\n  \\\"reel_script\\\": string, // 30-45s conversational\\n  \\\"hashtags\\\": { \\\"linkedin\\\": string[], \\\"twitter\\\": string[] },\\n  \\\"visual_prompts\\\": string[] // 1-2 visual ideas in concise prompt form for text-to-image\\n}\\nVoice: clear, educational, a bit motivational, professional but approachable.\\nAudience: tech pros, aspiring engineers, security/DevOps learners.\\nConstraints: Do not exceed 250 words for LinkedIn; twitter <= 280 chars. Output JSON only."
+      },
+      "id": "GPT5_Content",
+      "name": "GPT-5 (Content JSON)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "credentials": {
+        "openAIApi": {
+          "id": "openai_api_cred_id"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "let obj;\\ntry {\\n  obj = JSON.parse(items[0].json.data ?? items[0].json.text ?? items[0].json.response ?? JSON.stringify(items[0].json));\\n} catch (e) {\\n  throw new Error('Model did not return valid JSON: ' + e.message);\\n}\\nreturn [{ json: obj }];"
+      },
+      "id": "Parse_JSON",
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "functionCode": "const firstVisual = (items[0].json.visual_prompts && items[0].json.visual_prompts[0]) || \\\"flat vector diagram of PC \u2192 Switch \u2192 Router \u2192 Internet, minimal tech infographic, high contrast, clean labels\\\";\\nreturn [{ json: { prompt: firstVisual } }];"
+      },
+      "id": "Pick_Visual",
+      "name": "Pick Visual Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "createImage",
+        "image": {
+          "model": "gpt-image-1",
+          "prompt": "{{$json.prompt}}",
+          "size": "1024x1024"
+        }
+      },
+      "id": "OpenAI_Image",
+      "name": "OpenAI Image (1024)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "credentials": {
+        "openAIApi": {
+          "id": "openai_api_cred_id"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Merge content + image URL, enforce limits, add scheduled time\\nconst content = $items(\\\"Parse JSON\\\")[0].json;\\nconst imgNode = $items(\\\"OpenAI Image (1024)\\\")[0].json;\\nconst imageUrl = imgNode.data?.[0]?.url || imgNode.url || null;\\n\\nfunction trimTweet(s) {\\n  if (!s) return \\\"\\\";\\n  return s.length <= 280 ? s : s.slice(0, 277) + \\\"...\\\";\\n}\\n\\nconst now = new Date();\\nconst sched = new Date();\\nsched.setHours(10, 15, 0, 0);\\nif (sched < now) {\\n  sched.setDate(sched.getDate() + 1);\\n}\\n\\nreturn [{\\n  json: {\\n    title: content.title,\\n    linkedin: content.linkedin,\\n    twitter: trimTweet(content.twitter),\\n    reel_script: content.reel_script,\\n    hashtags: content.hashtags,\\n    visual_prompt: $items(\\\"Pick Visual Prompt\\\")[0].json.prompt,\\n    image_url: imageUrl,\\n    scheduled_at_iso: sched.toISOString()\\n  }\\n}];"
+      },
+      "id": "Compose_Post",
+      "name": "Compose Post Payload",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "requestMethod": "POST",
+        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\\n  \\\"profile_ids\\\": [\\\"REPLACE_WITH_BUFFER_PROFILE_ID\\\"],\\n  \\\"text\\\": $json.title + \\\"\\\\n\\\\n\\\" + $json.linkedin + \\\"\\\\n\\\\n\\\" + ($json.hashtags?.linkedin?.map(h=> (h.startsWith('#')?h:'#'+h)).join(' ') || ''),\\n  \\\"scheduled_at\\\": $json.scheduled_at_iso,\\n  \\\"media\\\": {\\n    \\\"photo\\\": $json.image_url\\n  },\\n  \\\"now\\\": false\\n}"
+      },
+      "id": "Buffer_LinkedIn",
+      "name": "Buffer: Schedule (LinkedIn)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "credentials": {
+        "oAuth2Api": {
+          "id": "buffer_oauth2_cred_id"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "requestMethod": "POST",
+        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\\n  \\\"profile_ids\\\": [\\\"REPLACE_WITH_BUFFER_TWITTER_PROFILE_ID\\\"],\\n  \\\"text\\\": $json.twitter + \\\"\\\\n\\\\n\\\" + ($json.hashtags?.twitter?.map(h=> (h.startsWith('#')?h:'#'+h)).join(' ') || ''),\\n  \\\"scheduled_at\\\": $json.scheduled_at_iso,\\n  \\\"media\\\": {\\\"photo\\\": $json.image_url},\\n  \\\"now\\\": false\\n}"
+      },
+      "id": "Buffer_Twitter",
+      "name": "Buffer: Schedule (Twitter/X)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "credentials": {
+        "oAuth2Api": {
+          "id": "buffer_oauth2_cred_id"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "requestMethod": "POST",
+        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\\n  \\\"profile_ids\\\": [\\\"REPLACE_WITH_BUFFER_IG_PROFILE_ID\\\"],\\n  \\\"text\\\": $json.title + \\\" \u2014 \\\" + ($json.hashtags?.linkedin?.slice(0,8).map(h=> (h.startsWith('#')?h:'#'+h)).join(' ') || ''),\\n  \\\"scheduled_at\\\": $json.scheduled_at_iso,\\n  \\\"media\\\": {\\\"photo\\\": $json.image_url},\\n  \\\"now\\\": false\\n}"
+      },
+      "id": "Buffer_Instagram",
+      "name": "Buffer: Schedule (Instagram)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "credentials": {
+        "oAuth2Api": {
+          "id": "buffer_oauth2_cred_id"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "sheetId": "REPLACE_WITH_GOOGLE_SHEET_ID",
+        "range": "Archive!A:E",
+        "options": {
+          "valueInputMode": "RAW"
+        },
+        "fields": "={{[\\n  new Date().toISOString(),\\n  $json.title,\\n  $json.visual_prompt,\\n  $json.image_url,\\n  $json.scheduled_at_iso\\n]}}"
+      },
+      "id": "Google_Sheets_Log",
+      "name": "Google Sheets: Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "credentials": {
+        "googleApi": {
+          "id": "google_sheets_oauth2_cred_id"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron (Daily 09:00 PT)": {
+      "main": [
+        [
+          {
+            "node": "Pick Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Topic": {
+      "main": [
+        [
+          {
+            "node": "GPT-5 (Content JSON)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-5 (Content JSON)": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON": {
+      "main": [
+        [
+          {
+            "node": "Pick Visual Prompt",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Compose Post Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Visual Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Image (1024)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Image (1024)": {
+      "main": [
+        [
+          {
+            "node": "Compose Post Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Post Payload": {
+      "main": [
+        [
+          {
+            "node": "Buffer: Schedule (LinkedIn)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Buffer: Schedule (Twitter/X)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Buffer: Schedule (Instagram)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets: Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
