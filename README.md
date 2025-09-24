@@ -35,6 +35,34 @@ python3 manage.py start
 - Buffer account (for social media scheduling)
 - Google account (for Sheets logging)
 
+### n8n HTTP Request Node Configuration
+
+**Important:** For OpenAI API calls, use the correct HTTP Request configuration:
+
+#### GPT-4 Node Configuration:
+1. **Authentication**: `Predefined Credential Type` → `OpenAI`
+2. **Method**: `POST`
+3. **URL**: `https://api.openai.com/v1/chat/completions`
+4. **Headers**: 
+   - `Content-Type`: `application/json`
+5. **Body Configuration**:
+   - **Body Content Type**: `JSON`
+   - **Specify Body**: `Using JSON`
+   - **JSON**: Complete JSON object with all parameters
+
+#### OpenAI Image Node Configuration:
+1. **Authentication**: `Predefined Credential Type` → `OpenAI`
+2. **Method**: `POST`
+3. **URL**: `https://api.openai.com/v1/images/generations`
+4. **Headers**: 
+   - `Content-Type`: `application/json`
+5. **Body Configuration**:
+   - **Body Content Type**: `JSON`
+   - **Specify Body**: `Using JSON`
+   - **JSON**: Complete JSON object with all parameters
+
+**Key Point**: Use `Specify Body: Using JSON` instead of individual parameters to avoid "Invalid type for 'messages'" errors.
+
 ### Step-by-Step Setup
 
 1. **Clone and navigate to the project:**
@@ -157,6 +185,32 @@ python3 scripts/manage.py cleanup
 **Warning**: Cleanup permanently removes all n8n data, workflows, and configurations.
 
 ## Troubleshooting
+
+### n8n HTTP Request Node Issues
+
+**Error: "Invalid type for 'messages': expected an array of objects, but got a string instead"**
+
+**Solution**: Use the correct HTTP Request configuration:
+1. **Body Content Type**: `JSON`
+2. **Specify Body**: `Using JSON` (not "Using Fields Below")
+3. **JSON**: Provide complete JSON object with all parameters
+
+**Error: "you must provide a model parameter"**
+
+**Solution**: Ensure the JSON body includes the `model` parameter:
+```json
+{
+  "model": "gpt-4o",
+  "messages": [...],
+  "max_tokens": 2000
+}
+```
+
+**Error: "Install this node to use it"**
+
+**Solution**: Use HTTP Request nodes instead of deprecated OpenAI nodes:
+- Replace `n8n-nodes-base.openAi` with `n8n-nodes-base.httpRequest`
+- Configure manually using the steps above
 
 ### Docker Issues
 ```bash

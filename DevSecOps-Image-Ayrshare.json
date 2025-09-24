@@ -1,0 +1,348 @@
+{
+  "name": "Daily DevSecOps Content \u2192 Image \u2192 Ayrshare",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "trigger-1",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1456,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const topics = [\n  \"CCNA fundamentals\",\n  \"Subnetting drills\",\n  \"Routing vs Switching\",\n  \"Troubleshooting playbook\",\n  \"Network security basics\",\n  \"VLANs & trunking\",\n  \"NAT vs PAT\",\n  \"OSPF vs EIGRP basics\",\n  \"Wireless basics (RSSI/SNR)\",\n  \"Packet captures 101\"\n];\nconst idx = (new Date().getDate()) % topics.length;\nreturn [{ json: { topic: topics[idx] }}];\n"
+      },
+      "id": "code-1",
+      "name": "Pick Topic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1232,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an elite content strategist. Always return valid minified JSON (no markdown, no explanations).\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate one content pack around the topic: {{$json.topic}}. Return STRICT JSON with this shape: {\\\"title\\\": string, \\\"linkedin\\\": string, \\\"twitter\\\": string, \\\"reel_script\\\": string, \\\"hashtags\\\": {\\\"linkedin\\\": string[], \\\"twitter\\\": string[]}, \\\"visual_prompts\\\": string[]}. Voice: clear, educational, a bit motivational, professional but approachable. Audience: tech pros, aspiring engineers, security/DevOps learners. Constraints: Do not exceed 250 words for LinkedIn; twitter <= 280 chars. Output JSON only.\"\n    }\n  ],\n  \"max_tokens\": 2000\n}\n",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "http-1",
+      "name": "GPT-4 (Content JSON)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -1008,
+        144
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_OPENAI_CRED_ID",
+          "name": "OpenAI Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let obj;\ntry {\n  if (!items || items.length === 0) throw new Error('No input data received from previous node');\n  if (!items[0] || !items[0].json) throw new Error('Input data is missing or malformed');\n  const responseData = items[0].json.body || items[0].json;\n  if (!responseData.choices || !Array.isArray(responseData.choices)) throw new Error('GPT-4 response missing choices array.');\n  if (!responseData.choices[0]) throw new Error('GPT-4 response choices array is empty');\n  if (!responseData.choices[0].message || !responseData.choices[0].message.content) throw new Error('GPT-4 response missing message content');\n  let response = responseData.choices[0].message.content;\n  if (response.startsWith('```json\\n')) response = response.substring(8);\n  if (response.endsWith('```')) response = response.substring(0, response.length - 3);\n  response = response.trim();\n  obj = JSON.parse(response);\n} catch (e) {\n  throw new Error('Model did not return valid JSON: ' + e.message);\n}\nreturn [{ json: obj }];\n"
+      },
+      "id": "code-2",
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const topic = $items(\"Parse JSON\")[0].json.title || $items(\"Parse JSON\")[0].json.topic || \"cybersecurity best practices\";\nconst firstVisual = ($items(\"Parse JSON\")[0].json.visual_prompts && $items(\"Parse JSON\")[0].json.visual_prompts[0]) || \"\";\nconst base = firstVisual && firstVisual.length > 20 ? firstVisual : `An abstract, high\u2011tech illustration representing ${topic}`;\nconst safe = `${base}, cinematic digital art, ultra\u2011detailed, soft rim lighting, depth of field, high contrast, no words, no text, no letters, no logos, no watermarks`;\nreturn [{ json: { dalle_prompt: safe } }];\n"
+      },
+      "id": "code-3",
+      "name": "Clean Visual Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\\n  \\\"model\\\": \\\"dall-e-3\\\",\\n  \\\"prompt\\\": \\\"{{$json.dalle_prompt}}\\\",\\n  \\\"size\\\": \\\"1024x1024\\\"\\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "http-2",
+      "name": "OpenAI Image (1024)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -576,
+        320
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_OPENAI_CRED_ID",
+          "name": "OpenAI Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = $items(\"Parse JSON\")[0].json;\nconst imgNode = $items(\"OpenAI Image (1024)\")[0].json;\nconst imageUrl = (imgNode.data && imgNode.data[0] && imgNode.data[0].url) ? imgNode.data[0].url : imgNode.url || null;\n\nfunction trimTweet(s) {\n  if (!s) return \"\";\n  return s.length <= 280 ? s : s.slice(0, 277) + \"...\";\n}\n\nconst now = new Date();\nconst sched = new Date();\nsched.setHours(10, 15, 0, 0);\nif (sched < now) sched.setDate(sched.getDate() + 1);\n\nconst baseTags = (content.hashtags && Array.isArray(content.hashtags.twitter)) ? content.hashtags.twitter : [];\nconst hashLine = baseTags.length ? \"\\n\\n\" + baseTags.map(h => (h.startsWith('#') ? h : '#' + h.replace(/\\s+/g, ''))).join(' ') : \"\";\n\nconst twitterText = trimTweet((content.twitter || \"\").trim() + hashLine);\nconst linkedinText = (content.linkedin || \"\").trim() + (content.hashtags && content.hashtags.linkedin && content.hashtags.linkedin.length ? \"\\n\\n\" + content.hashtags.linkedin.map(h => (h.startsWith('#') ? h : '#' + h.replace(/\\s+/g, ''))).join(' ') : \"\");\n\nreturn [{\n  json: {\n    title: content.title,\n    linkedin: linkedinText,\n    twitter: twitterText,\n    reel_script: content.reel_script,\n    hashtags: content.hashtags,\n    image_url: imageUrl,\n    scheduled_at_iso: sched.toISOString()\n  }\n}];\n"
+      },
+      "id": "code-4",
+      "name": "Compose Post Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.ayrshare.com/api/post",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"post\": \"{{$json.twitter}}\",\n  \"platforms\": [\"twitter\",\"linkedin\"],\n  \"mediaUrls\": {{$json.image_url ? '[\"' + $json.image_url + '\"]' : '[]'}},\n  \"scheduleDate\": \"{{$json.scheduled_at_iso}}\",\n  \"shortenLinks\": false,\n  \"returnPermalinks\": true\n}\n",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "http-3",
+      "name": "Ayrshare: Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -352,
+        144
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_AYRSHARE_HTTP_HEADER_CRED_ID",
+          "name": "Ayrshare HTTP Header (Authorization: Bearer <API_KEY>)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {},
+        "keyRow": 1,
+        "addColumns": true,
+        "valueInputMode": "RAW",
+        "columns": [
+          {
+            "column": "Timestamp",
+            "value": "={{$now}}"
+          },
+          {
+            "column": "Title",
+            "value": "={{$json.title}}"
+          },
+          {
+            "column": "ScheduledAtISO",
+            "value": "={{$json.scheduled_at_iso}}"
+          },
+          {
+            "column": "ImageURL",
+            "value": "={{$json.image_url}}"
+          },
+          {
+            "column": "AyrshareStatus",
+            "value": "={{$node[\"Ayrshare: Post\"].json.body ? $node[\"Ayrshare: Post\"].json.body.status : $node[\"Ayrshare: Post\"].json.status}}"
+          },
+          {
+            "column": "AyrshareResponse",
+            "value": "={{JSON.stringify($node[\"Ayrshare: Post\"].json)}}"
+          }
+        ]
+      },
+      "id": "gs-1",
+      "name": "Google Sheets: Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -352,
+        336
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Pick Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Topic": {
+      "main": [
+        [
+          {
+            "node": "GPT-4 (Content JSON)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4 (Content JSON)": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON": {
+      "main": [
+        [
+          {
+            "node": "Clean Visual Prompt",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Compose Post Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Visual Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Image (1024)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Image (1024)": {
+      "main": [
+        [
+          {
+            "node": "Compose Post Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Post Payload": {
+      "main": [
+        [
+          {
+            "node": "Ayrshare: Post",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets: Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "v1-ayrshare-001",
+  "id": "DevSecOps-Image-Ayrshare"
+}

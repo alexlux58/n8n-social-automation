@@ -12,25 +12,31 @@
           ]
         }
       },
-      "id": "cron-trigger",
+      "id": "c9a7eb47-e17a-46e3-9127-cab11c5c7758",
       "name": "Daily Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
-      "position": [240, 300]
+      "position": [
+        -1456,
+        144
+      ]
     },
     {
       "parameters": {
         "jsCode": "const topics = [\n  \"CCNA fundamentals\",\n  \"Subnetting drills\",\n  \"Routing vs Switching\",\n  \"Troubleshooting playbook\",\n  \"Network security basics\",\n  \"VLANs & trunking\",\n  \"NAT vs PAT\",\n  \"OSPF vs EIGRP basics\",\n  \"Wireless basics (RSSI/SNR)\",\n  \"Packet captures 101\"\n];\nconst idx = (new Date().getDate()) % topics.length;\nreturn [{ json: { topic: topics[idx] }}];"
       },
-      "id": "pick-topic",
+      "id": "cdfe3488-7208-440f-a70e-e7e046b924d8",
       "name": "Pick Topic",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [460, 300]
+      "position": [
+        -1232,
+        144
+      ]
     },
     {
       "parameters": {
-        "requestMethod": "POST",
+        "method": "POST",
         "url": "https://api.openai.com/v1/chat/completions",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "openAiApi",
@@ -44,7 +50,6 @@
           ]
         },
         "sendBody": true,
-        "bodyContentType": "json",
         "specifyBody": "json",
         "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an elite content strategist. Always return valid minified JSON (no markdown, no explanations).\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate one content pack around the topic: {{$json.topic}}. Return STRICT JSON with this shape: {\\\"title\\\": string, \\\"linkedin\\\": string, \\\"twitter\\\": string, \\\"reel_script\\\": string, \\\"hashtags\\\": {\\\"linkedin\\\": string[], \\\"twitter\\\": string[]}, \\\"visual_prompts\\\": string[]}. Voice: clear, educational, a bit motivational, professional but approachable. Audience: tech pros, aspiring engineers, security/DevOps learners. Constraints: Do not exceed 250 words for LinkedIn; twitter <= 280 chars. Output JSON only.\"\n    }\n  ],\n  \"max_tokens\": 2000\n}",
         "options": {
@@ -55,35 +60,50 @@
           }
         }
       },
-      "id": "gpt-content",
+      "id": "6c62c33b-8752-41eb-ab80-577ce17673b5",
       "name": "GPT-4 (Content JSON)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [680, 300]
+      "position": [
+        -1008,
+        144
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "O50d2es33lZgvwNs",
+          "name": "OpenAi account"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "let obj;\\ntry {\\n  let response = items[0].json.choices[0].message.content;\\n  // Remove 'json\\n ' prefix if present\\n  if (response.startsWith('json\\\\n ')) {\\n    response = response.substring(6);\\n  }\\n  // Remove any leading/trailing whitespace\\n  response = response.trim();\\n  obj = JSON.parse(response);\\n} catch (e) {\\n  throw new Error('Model did not return valid JSON: ' + e.message);\\n}\\nreturn [{ json: obj }];"
+        "jsCode": "let obj;\ntry {\n  // Check if items exist and have data\n  if (!items || items.length === 0) {\n    throw new Error('No input data received from previous node');\n  }\n  \n  if (!items[0] || !items[0].json) {\n    throw new Error('Input data is missing or malformed');\n  }\n  \n  // The response structure has the data nested under 'body'\n  const responseData = items[0].json.body || items[0].json;\n  \n  // Check if choices array exists\n  if (!responseData.choices || !Array.isArray(responseData.choices)) {\n    throw new Error('GPT-4 response is missing choices array. Response structure: ' + JSON.stringify(responseData, null, 2));\n  }\n  \n  if (!responseData.choices[0]) {\n    throw new Error('GPT-4 response choices array is empty');\n  }\n  \n  if (!responseData.choices[0].message || !responseData.choices[0].message.content) {\n    throw new Error('GPT-4 response is missing message content');\n  }\n  \n  let response = responseData.choices[0].message.content;\n  \n  // Remove '```json\\n' prefix and '```' suffix if present\n  if (response.startsWith('```json\\n')) {\n    response = response.substring(8);\n  }\n  if (response.endsWith('```')) {\n    response = response.substring(0, response.length - 3);\n  }\n  \n  // Remove any leading/trailing whitespace\n  response = response.trim();\n  \n  obj = JSON.parse(response);\n} catch (e) {\n  throw new Error('Model did not return valid JSON: ' + e.message);\n}\nreturn [{ json: obj }];"
       },
-      "id": "parse-json",
+      "id": "095bde07-e869-4c53-8c09-a71372053a8b",
       "name": "Parse JSON",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [900, 300]
+      "position": [
+        -800,
+        144
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const firstVisual = (items[0].json.visual_prompts && items[0].json.visual_prompts[0]) || \"Create a modern troubleshooting flowchart with NO TEXT, only icons and arrows. Use clean flat design, blue and white colors, simple geometric shapes, professional business style, minimal icons, no words or labels, suitable for social media\";\\nreturn [{ json: { prompt: firstVisual } }];"
+        "jsCode": "const firstVisual = (items[0].json.visual_prompts && items[0].json.visual_prompts[0]) || \"Create a clean, professional infographic about troubleshooting steps. Use English text only, modern flat design style, high contrast colors, minimal text, clear visual hierarchy, no decorative elements, focus on icons and simple graphics, professional business style, suitable for social media\";\nreturn [{ json: { prompt: firstVisual } }];"
       },
-      "id": "pick-visual",
+      "id": "5d263306-b1af-408e-a1be-fb61072ab3a4",
       "name": "Pick Visual Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [900, 480]
+      "position": [
+        -800,
+        320
+      ]
     },
     {
       "parameters": {
-        "requestMethod": "POST",
+        "method": "POST",
         "url": "https://api.openai.com/v1/images/generations",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "openAiApi",
@@ -97,7 +117,6 @@
           ]
         },
         "sendBody": true,
-        "bodyContentType": "json",
         "specifyBody": "json",
         "jsonBody": "={\n  \"model\": \"dall-e-3\",\n  \"prompt\": \"{{$json.prompt}}\",\n  \"size\": \"1024x1024\"\n}",
         "options": {
@@ -108,84 +127,106 @@
           }
         }
       },
-      "id": "openai-image",
+      "id": "c4d84396-7e2e-4261-8adf-0e94c0dbf968",
       "name": "OpenAI Image (1024)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1120, 480]
+      "position": [
+        -576,
+        320
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "O50d2es33lZgvwNs",
+          "name": "OpenAi account"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "// Merge content + image URL, enforce limits, add scheduled time\\nconst content = $items(\\\"Parse JSON\\\")[0].json;\\nconst imgNode = $items(\\\"OpenAI Image (1024)\\\")[0].json;\\nconst imageUrl = imgNode.data?.[0]?.url || imgNode.url || null;\\n\\nfunction trimTweet(s) {\\n  if (!s) return \\\"\\\";\\n  return s.length <= 280 ? s : s.slice(0, 277) + \\\"...\\\";\\n}\\n\\nconst now = new Date();\\nconst sched = new Date();\\nsched.setHours(10, 15, 0, 0);\\nif (sched < now) {\\n  sched.setDate(sched.getDate() + 1);\\n}\\n\\nreturn [{\\n  json: {\\n    title: content.title,\\n    linkedin: content.linkedin,\\n    twitter: trimTweet(content.twitter),\\n    reel_script: content.reel_script,\\n    hashtags: content.hashtags,\\n    visual_prompt: $items(\\\"Pick Visual Prompt\\\")[0].json.prompt,\\n    image_url: imageUrl,\\n    scheduled_at_iso: sched.toISOString()\\n  }\\n}];"
+        "jsCode": "// Merge content + image URL, enforce limits, add scheduled time\nconst content = $items(\"Parse JSON\")[0].json;\nconst imgNode = $items(\"OpenAI Image (1024)\")[0].json;\nconst imageUrl = imgNode.data?.[0]?.url || imgNode.url || null;\n\nfunction trimTweet(s) {\n  if (!s) return \"\";\n  return s.length <= 280 ? s : s.slice(0, 277) + \"...\";\n}\n\nconst now = new Date();\nconst sched = new Date();\nsched.setHours(10, 15, 0, 0);\nif (sched < now) {\n  sched.setDate(sched.getDate() + 1);\n}\n\nreturn [{\n  json: {\n    title: content.title,\n    linkedin: content.linkedin,\n    twitter: trimTweet(content.twitter),\n    reel_script: content.reel_script,\n    hashtags: content.hashtags,\n    visual_prompt: $items(\"Pick Visual Prompt\")[0].json.prompt,\n    image_url: imageUrl,\n    scheduled_at_iso: sched.toISOString()\n  }\n}];"
       },
-      "id": "compose-post",
+      "id": "9a9618f0-29d2-4e3b-b4b2-5336a1a152e6",
       "name": "Compose Post Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, 300]
+      "position": [
+        -576,
+        144
+      ]
     },
     {
       "parameters": {
-        "authentication": "oAuth2",
-        "requestMethod": "POST",
         "url": "https://api.bufferapp.com/1/updates/create.json",
-        "jsonParameters": true,
-        "options": {},
-        "bodyParametersJson": "={\\n  \\\"profile_ids\\\": [\\\"REPLACE_WITH_BUFFER_PROFILE_ID\\\"],\\n  \\\"text\\\": $json.title + \\\"\\\\n\\\\n\\\" + $json.linkedin + \\\"\\\\n\\\\n\\\" + ($json.hashtags?.linkedin?.map(h=> (h.startsWith('#')?h:'#'+h)).join(' ') || ''),\\n  \\\"scheduled_at\\\": $json.scheduled_at_iso,\\n  \\\"media\\\": {\\n    \\\"photo\\\": $json.image_url\\n  },\\n  \\\"now\\\": false\\n}"
-      },
-      "id": "buffer-linkedin",
-      "name": "Buffer: Schedule (LinkedIn)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1340, 200]
-    },
-    {
-      "parameters": {
         "authentication": "oAuth2",
-        "requestMethod": "POST",
-        "url": "https://api.bufferapp.com/1/updates/create.json",
-        "jsonParameters": true,
-        "options": {},
-        "bodyParametersJson": "={\\n  \\\"profile_ids\\\": [\\\"REPLACE_WITH_BUFFER_TWITTER_PROFILE_ID\\\"],\\n  \\\"text\\\": $json.twitter + \\\"\\\\n\\\\n\\\" + ($json.hashtags?.twitter?.map(h=> (h.startsWith('#')?h:'#'+h)).join(' ') || ''),\\n  \\\"scheduled_at\\\": $json.scheduled_at_iso,\\n  \\\"media\\\": {\\\"photo\\\": $json.image_url},\\n  \\\"now\\\": false\\n}"
+        "options": {}
       },
-      "id": "buffer-twitter",
+      "id": "4702b0cc-1dce-4e1c-b0f2-30cf294093cc",
       "name": "Buffer: Schedule (Twitter/X)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1340, 300]
+      "position": [
+        -352,
+        144
+      ]
     },
     {
       "parameters": {
-        "authentication": "oAuth2",
-        "requestMethod": "POST",
         "url": "https://api.bufferapp.com/1/updates/create.json",
-        "jsonParameters": true,
-        "options": {},
-        "bodyParametersJson": "={\\n  \\\"profile_ids\\\": [\\\"REPLACE_WITH_BUFFER_IG_PROFILE_ID\\\"],\\n  \\\"text\\\": $json.title + \\\" — \\\" + ($json.hashtags?.linkedin?.slice(0,8).map(h=> (h.startsWith('#')?h:'#'+h)).join(' ') || ''),\\n  \\\"scheduled_at\\\": $json.scheduled_at_iso,\\n  \\\"media\\\": {\\\"photo\\\": $json.image_url},\\n  \\\"now\\\": false\\n}"
+        "authentication": "oAuth2",
+        "options": {}
       },
-      "id": "buffer-instagram",
+      "id": "59e23505-d488-44c8-9f8a-a7218ccbe87a",
       "name": "Buffer: Schedule (Instagram)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1340, 400]
+      "position": [
+        -352,
+        240
+      ]
     },
     {
       "parameters": {
         "operation": "append",
-        "sheetId": "REPLACE_WITH_GOOGLE_SHEET_ID",
-        "range": "Archive!A:E",
-        "options": {
-          "valueInputMode": "RAW"
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
         },
-        "fields": "={{[\\n  new Date().toISOString(),\\n  $json.title,\\n  $json.visual_prompt,\\n  $json.image_url,\\n  $json.scheduled_at_iso\\n]}}"
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
       },
-      "id": "google-sheets-log",
+      "id": "4ec98ad5-d8fc-4f39-a7f9-fd993d14cd0f",
       "name": "Google Sheets: Log",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [1340, 500]
+      "position": [
+        -352,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -352,
+        16
+      ],
+      "id": "e5e3d3f9-55bf-4ff0-9b4d-5802322c52b1",
+      "name": "HTTP Request"
     }
   ],
+  "pinData": {},
   "connections": {
     "Daily Trigger": {
       "main": [
@@ -262,11 +303,6 @@
       "main": [
         [
           {
-            "node": "Buffer: Schedule (LinkedIn)",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Buffer: Schedule (Twitter/X)",
             "type": "main",
             "index": 0
@@ -286,6 +322,14 @@
     }
   },
   "active": false,
-  "settings": {},
-  "versionId": "1"
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "66458e42-2426-42e8-8055-270ad043d342",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c0be856d8b0116a73aa240a54e1bb7306195575329eea0bcd2d71fee0b5e0dd8"
+  },
+  "id": "oXbzVKOfGz0xKa0S",
+  "tags": []
 }
