@@ -91,6 +91,7 @@ python3 scripts/manage.py start
 | `python3 scripts/manage.py status` | Show status of services |
 | `python3 scripts/manage.py logs` | Show logs from services |
 | `python3 scripts/manage.py backup` | Create backup of n8n data |
+| `python3 scripts/manage.py cleanup` | Complete cleanup (removes all data) |
 
 ## Configuration
 
@@ -138,6 +139,19 @@ docker compose exec postgres pg_dump -U n8n n8n > backup.sql
 # Volumes backup
 tar czf volumes_backup.tar.gz -C /var/lib/docker/volumes $(docker volume ls -q | grep n8n)
 ```
+
+## Cleanup
+
+### Complete Cleanup
+```bash
+# Remove all containers, volumes, and data
+python3 scripts/manage.py cleanup
+
+# Or use the standalone script
+./cleanup.sh
+```
+
+**Warning**: Cleanup permanently removes all n8n data, workflows, and configurations.
 
 ## Troubleshooting
 

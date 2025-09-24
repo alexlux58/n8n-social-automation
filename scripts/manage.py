@@ -193,6 +193,32 @@ def backup():
 
     print(f"Backup complete: {sql_file}, {tar_file}")
 
+def cleanup():
+    """Complete cleanup of n8n installation"""
+    print("🧹 Starting complete cleanup...")
+    print("This will remove all containers, volumes, and data.")
+    
+    # Confirmation
+    confirm = input("Are you sure? This cannot be undone! (yes/no): ")
+    if confirm.lower() != "yes":
+        print("Cleanup cancelled.")
+        return
+    
+    print("Stopping and removing containers...")
+    run("docker compose down --volumes --remove-orphans", check=False)
+    
+    print("Removing volumes...")
+    run("docker volume ls -q | grep -E '(n8n|postgres)' | xargs -r docker volume rm", check=False)
+    
+    print("Removing images...")
+    run("docker images --filter 'reference=n8nio/n8n' --format '{{.Repository}}:{{.Tag}}' | xargs -r docker rmi -f", check=False)
+    
+    print("Cleaning up Docker system...")
+    run("docker system prune -f", check=False)
+    
+    print("✅ Cleanup completed!")
+    print("To start fresh, run: python3 scripts/manage.py setup")
+
 def usage():
     print("n8n Social Automation Management Script")
     print("Usage: python3 scripts/manage.py [command]")
@@ -204,6 +230,7 @@ def usage():
     print("  status  - Show status of services")
     print("  logs    - Show logs from services")
     print("  backup  - Create backup of n8n data")
+    print("  cleanup - Complete cleanup (removes all data)")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -225,6 +252,8 @@ if __name__ == "__main__":
         logs()
     elif cmd == "backup":
         backup()
+    elif cmd == "cleanup":
+        cleanup()
     else:
         usage()
         sys.exit(1)
