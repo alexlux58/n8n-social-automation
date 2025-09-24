@@ -106,8 +106,19 @@ def check_dependencies():
         print("Docker installation completed. Please restart your terminal or log out and back in.")
         return False
     
+    # Check Docker daemon is running
+    if run("docker info", check=False) != 0:
+        print("Docker daemon is not running or not accessible.")
+        print("Please start Docker daemon:")
+        if platform.system().lower() == "linux":
+            print("  sudo systemctl start docker")
+            print("  sudo systemctl enable docker")
+        else:
+            print("  Start Docker Desktop from Applications")
+        return False
+    
     # Check for Docker Compose
-    if not check_command("docker") or run("docker compose version", check=False) != 0:
+    if run("docker compose version", check=False) != 0:
         print("Docker Compose not found or not working properly.")
         if platform.system().lower() == "linux":
             print("Installing Docker Compose plugin...")
