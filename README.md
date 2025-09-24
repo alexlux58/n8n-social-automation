@@ -1,29 +1,29 @@
 # n8n Social Automation
 
 Automated pipeline for daily DevSecOps/CCNA content:
-- Generates posts with GPT-5
+- Generates posts with GPT-4
 - Creates visuals with OpenAI Images
 - Schedules via Buffer
 - Logs to Google Sheets
 
 ## Quick Start
 
-### Option 1: Automated Setup (Recommended)
+### One-Command Deployment
 ```bash
-# Run the automated setup script
-./setup.sh
+# Complete setup and start
+python3 manage.py deploy
 ```
 
-### Option 2: Manual Setup
+### Manual Setup
 ```bash
 # 1. Setup dependencies
-python3 scripts/manage.py setup
+python3 manage.py setup
 
 # 2. Edit configuration
 nano .env
 
 # 3. Start services
-python3 scripts/manage.py start
+python3 manage.py start
 ```
 
 ## Detailed Setup
@@ -84,14 +84,17 @@ python3 scripts/manage.py start
 
 | Command | Description |
 |---------|-------------|
-| `python3 scripts/manage.py setup` | Check and install dependencies |
-| `python3 scripts/manage.py start` | Start the n8n services |
-| `python3 scripts/manage.py stop` | Stop the n8n services |
-| `python3 scripts/manage.py restart` | Restart the n8n services |
-| `python3 scripts/manage.py status` | Show status of services |
-| `python3 scripts/manage.py logs` | Show logs from services |
-| `python3 scripts/manage.py backup` | Create backup of n8n data |
-| `python3 scripts/manage.py cleanup` | Complete cleanup (removes all data) |
+| `python3 manage.py deploy` | Complete deployment (setup + start) |
+| `python3 manage.py setup` | Check and install dependencies |
+| `python3 manage.py start` | Start the n8n services |
+| `python3 manage.py stop` | Stop the n8n services |
+| `python3 manage.py restart` | Restart the n8n services |
+| `python3 manage.py status` | Show status of services |
+| `python3 manage.py logs` | Show logs from services |
+| `python3 manage.py backup` | Create backup of n8n data |
+| `python3 manage.py cleanup` | Complete cleanup (removes all data) |
+| `python3 manage.py validate` | Validate workflow JSON structure |
+| `python3 manage.py fix-permissions` | Fix Docker permission issues |
 
 ## Configuration
 
@@ -177,13 +180,16 @@ sudo usermod -aG docker $USER
 ### Service Issues
 ```bash
 # Check service status
-python3 scripts/manage.py status
+python3 manage.py status
 
 # View logs
-python3 scripts/manage.py logs
+python3 manage.py logs
 
 # Restart services
-python3 scripts/manage.py restart
+python3 manage.py restart
+
+# Fix permissions if needed
+python3 manage.py fix-permissions
 ```
 
 ## Workflow Configuration
@@ -204,7 +210,9 @@ Modify the cron trigger to change posting frequency or time.
 ## Support
 
 For issues:
-1. Check the logs: `python3 scripts/manage.py logs`
+1. Check the logs: `python3 manage.py logs`
 2. Verify configuration in `.env`
 3. Ensure all API credentials are properly configured in n8n
 4. Check Docker service status
+5. Validate workflow: `python3 manage.py validate`
+6. Fix permissions: `python3 manage.py fix-permissions`

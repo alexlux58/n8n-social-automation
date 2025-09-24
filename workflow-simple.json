@@ -14,74 +14,127 @@
       },
       "id": "cron-trigger",
       "name": "Daily Trigger",
-      "type": "n8n-nodes-base.cron",
+      "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
       "position": [240, 300]
     },
     {
       "parameters": {
-        "functionCode": "const topics = [\n  \"CCNA fundamentals\",\n  \"Subnetting drills\",\n  \"Routing vs Switching\",\n  \"Troubleshooting playbook\",\n  \"Network security basics\",\n  \"VLANs & trunking\",\n  \"NAT vs PAT\",\n  \"OSPF vs EIGRP basics\",\n  \"Wireless basics (RSSI/SNR)\",\n  \"Packet captures 101\"\n];\nconst idx = (new Date().getDate()) % topics.length;\nreturn [{ json: { topic: topics[idx] }}];"
+        "jsCode": "const topics = [\n  \"CCNA fundamentals\",\n  \"Subnetting drills\",\n  \"Routing vs Switching\",\n  \"Troubleshooting playbook\",\n  \"Network security basics\",\n  \"VLANs & trunking\",\n  \"NAT vs PAT\",\n  \"OSPF vs EIGRP basics\",\n  \"Wireless basics (RSSI/SNR)\",\n  \"Packet captures 101\"\n];\nconst idx = (new Date().getDate()) % topics.length;\nreturn [{ json: { topic: topics[idx] }}];"
       },
       "id": "pick-topic",
       "name": "Pick Topic",
-      "type": "n8n-nodes-base.function",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [460, 300]
     },
     {
       "parameters": {
-        "model": "gpt-4o",
-        "systemMessage": "You are an elite content strategist. Always return valid minified JSON (no markdown, no explanations).",
-        "messages": "USER: Generate one content pack around the topic: {{$json.topic}}.\\nReturn STRICT JSON with this shape:\\n{\\n  \\\"title\\\": string,\\n  \\\"linkedin\\\": string, // 150-250 words, educational, approachable\\n  \\\"twitter\\\": string,  // <= 280 chars\\n  \\\"reel_script\\\": string, // 30-45s conversational\\n  \\\"hashtags\\\": { \\\"linkedin\\\": string[], \\\"twitter\\\": string[] },\\n  \\\"visual_prompts\\\": string[] // 1-2 visual ideas in concise prompt form for text-to-image\\n}\\nVoice: clear, educational, a bit motivational, professional but approachable.\\nAudience: tech pros, aspiring engineers, security/DevOps learners.\\nConstraints: Do not exceed 250 words for LinkedIn; twitter <= 280 chars. Output JSON only."
+        "requestMethod": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gpt-4o"
+            },
+            {
+              "name": "messages",
+              "value": "=[{\"role\": \"system\", \"content\": \"You are an elite content strategist. Always return valid minified JSON (no markdown, no explanations).\"}, {\"role\": \"user\", \"content\": \"Generate one content pack around the topic: {{$json.topic}}. Return STRICT JSON with this shape: {\\\"title\\\": string, \\\"linkedin\\\": string, \\\"twitter\\\": string, \\\"reel_script\\\": string, \\\"hashtags\\\": {\\\"linkedin\\\": string[], \\\"twitter\\\": string[]}, \\\"visual_prompts\\\": string[]}. Voice: clear, educational, a bit motivational, professional but approachable. Audience: tech pros, aspiring engineers, security/DevOps learners. Constraints: Do not exceed 250 words for LinkedIn; twitter <= 280 chars. Output JSON only.\"}]"
+            },
+            {
+              "name": "max_tokens",
+              "value": "2000"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "gpt-content",
       "name": "GPT-4 (Content JSON)",
-      "type": "n8n-nodes-base.openAi",
+      "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [680, 300]
     },
     {
       "parameters": {
-        "functionCode": "let obj;\\ntry {\\n  obj = JSON.parse(items[0].json.data ?? items[0].json.text ?? items[0].json.response ?? JSON.stringify(items[0].json));\\n} catch (e) {\\n  throw new Error('Model did not return valid JSON: ' + e.message);\\n}\\nreturn [{ json: obj }];"
+        "jsCode": "let obj;\\ntry {\\n  const response = items[0].json.choices[0].message.content;\\n  obj = JSON.parse(response);\\n} catch (e) {\\n  throw new Error('Model did not return valid JSON: ' + e.message);\\n}\\nreturn [{ json: obj }];"
       },
       "id": "parse-json",
       "name": "Parse JSON",
-      "type": "n8n-nodes-base.function",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [900, 300]
     },
     {
       "parameters": {
-        "functionCode": "const firstVisual = (items[0].json.visual_prompts && items[0].json.visual_prompts[0]) || \\\"flat vector diagram of PC → Switch → Router → Internet, minimal tech infographic, high contrast, clean labels\\\";\\nreturn [{ json: { prompt: firstVisual } }];"
+        "jsCode": "const firstVisual = (items[0].json.visual_prompts && items[0].json.visual_prompts[0]) || \\\"flat vector diagram of PC → Switch → Router → Internet, minimal tech infographic, high contrast, clean labels\\\";\\nreturn [{ json: { prompt: firstVisual } }];"
       },
       "id": "pick-visual",
       "name": "Pick Visual Prompt",
-      "type": "n8n-nodes-base.function",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [900, 480]
     },
     {
       "parameters": {
-        "operation": "createImage",
-        "image": {
-          "model": "dall-e-3",
-          "prompt": "{{$json.prompt}}",
-          "size": "1024x1024"
-        }
+        "requestMethod": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "dall-e-3"
+            },
+            {
+              "name": "prompt",
+              "value": "={{$json.prompt}}"
+            },
+            {
+              "name": "size",
+              "value": "1024x1024"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "openai-image",
       "name": "OpenAI Image (1024)",
-      "type": "n8n-nodes-base.openAi",
+      "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1120, 480]
     },
     {
       "parameters": {
-        "functionCode": "// Merge content + image URL, enforce limits, add scheduled time\\nconst content = $items(\\\"Parse JSON\\\")[0].json;\\nconst imgNode = $items(\\\"OpenAI Image (1024)\\\")[0].json;\\nconst imageUrl = imgNode.data?.[0]?.url || imgNode.url || null;\\n\\nfunction trimTweet(s) {\\n  if (!s) return \\\"\\\";\\n  return s.length <= 280 ? s : s.slice(0, 277) + \\\"...\\\";\\n}\\n\\nconst now = new Date();\\nconst sched = new Date();\\nsched.setHours(10, 15, 0, 0);\\nif (sched < now) {\\n  sched.setDate(sched.getDate() + 1);\\n}\\n\\nreturn [{\\n  json: {\\n    title: content.title,\\n    linkedin: content.linkedin,\\n    twitter: trimTweet(content.twitter),\\n    reel_script: content.reel_script,\\n    hashtags: content.hashtags,\\n    visual_prompt: $items(\\\"Pick Visual Prompt\\\")[0].json.prompt,\\n    image_url: imageUrl,\\n    scheduled_at_iso: sched.toISOString()\\n  }\\n}];"
+        "jsCode": "// Merge content + image URL, enforce limits, add scheduled time\\nconst content = $items(\\\"Parse JSON\\\")[0].json;\\nconst imgNode = $items(\\\"OpenAI Image (1024)\\\")[0].json;\\nconst imageUrl = imgNode.data?.[0]?.url || imgNode.url || null;\\n\\nfunction trimTweet(s) {\\n  if (!s) return \\\"\\\";\\n  return s.length <= 280 ? s : s.slice(0, 277) + \\\"...\\\";\\n}\\n\\nconst now = new Date();\\nconst sched = new Date();\\nsched.setHours(10, 15, 0, 0);\\nif (sched < now) {\\n  sched.setDate(sched.getDate() + 1);\\n}\\n\\nreturn [{\\n  json: {\\n    title: content.title,\\n    linkedin: content.linkedin,\\n    twitter: trimTweet(content.twitter),\\n    reel_script: content.reel_script,\\n    hashtags: content.hashtags,\\n    visual_prompt: $items(\\\"Pick Visual Prompt\\\")[0].json.prompt,\\n    image_url: imageUrl,\\n    scheduled_at_iso: sched.toISOString()\\n  }\\n}];"
       },
       "id": "compose-post",
       "name": "Compose Post Payload",
-      "type": "n8n-nodes-base.function",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1120, 300]
     }

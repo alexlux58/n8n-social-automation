@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
+"""
+n8n Social Automation - Unified Management Script
+Handles setup, deployment, validation, and maintenance
+"""
+
 import os
 import sys
 import subprocess
 import platform
 import shutil
+import json
 from datetime import datetime
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 BACKUP_DIR = os.path.join(PROJECT_ROOT, "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 def run(cmd, check=True):
+    """Run command with optional error checking"""
     print(f"> {cmd}")
     result = subprocess.call(cmd, shell=True, cwd=PROJECT_ROOT)
     if check and result != 0:
@@ -136,14 +143,14 @@ def setup():
     print("Setting up n8n Social Automation...")
     
     if not check_dependencies():
-        print("\nSetup incomplete. Please address the issues above and run 'python3 scripts/manage.py setup' again.")
+        print("\nSetup incomplete. Please address the issues above and run 'python3 manage.py setup' again.")
         return False
     
     print("\nSetup completed successfully!")
     print("Next steps:")
     print("1. Edit .env file with your actual API keys and configuration")
-    print("2. Run 'python3 scripts/manage.py start' to start the services")
-    print("3. Open http://localhost:5678 in your browser")
+    print("2. Run 'python3 manage.py start' to start the services")
+    print("3. Open http://192.168.4.210:5678 in your browser")
     print("4. Import the workflow.json file into n8n")
     return True
 
@@ -153,7 +160,7 @@ def start():
     
     # Check dependencies first
     if not check_dependencies():
-        print("Dependencies not satisfied. Run 'python3 scripts/manage.py setup' first.")
+        print("Dependencies not satisfied. Run 'python3 manage.py setup' first.")
         return False
     
     # Check if services are already running
@@ -164,7 +171,7 @@ def start():
     
     run("docker compose up -d")
     print("Services started successfully!")
-    print("n8n UI available at: http://localhost:5678")
+    print("n8n UI available at: http://192.168.4.210:5678")
     return True
 
 def stop():
@@ -228,20 +235,75 @@ def cleanup():
     run("docker system prune -f", check=False)
     
     print("✅ Cleanup completed!")
-    print("To start fresh, run: python3 scripts/manage.py setup")
+    print("To start fresh, run: python3 manage.py setup")
+
+def validate():
+    """Validate the workflow JSON structure"""
+    print("Validating workflow structure...")
+    result = run("python3 validate_workflow.py", check=False)
+    if result == 0:
+        print("✅ Workflow validation passed!")
+    else:
+        print("❌ Workflow validation failed!")
+    return result == 0
+
+def fix_permissions():
+    """Fix Docker permission issues"""
+    print("🔧 Fixing Docker permissions...")
+    
+    # Get current user
+    current_user = os.getenv('USER')
+    print(f"Current user: {current_user}")
+    
+    # Add user to docker group
+    run(f"sudo usermod -aG docker {current_user}")
+    
+    # Start Docker daemon
+    run("sudo systemctl start docker")
+    run("sudo systemctl enable docker")
+    
+    print("✅ Permissions fixed!")
+    print("You may need to log out and back in for group changes to take effect.")
+    print("Or run: newgrp docker")
 
 def usage():
-    print("n8n Social Automation Management Script")
-    print("Usage: python3 scripts/manage.py [command]")
+    print("n8n Social Automation - Unified Management")
+    print("Usage: python3 manage.py [command]")
     print("\nCommands:")
-    print("  setup   - Check and install dependencies")
-    print("  start   - Start the n8n services")
-    print("  stop    - Stop the n8n services")
-    print("  restart - Restart the n8n services")
-    print("  status  - Show status of services")
-    print("  logs    - Show logs from services")
-    print("  backup  - Create backup of n8n data")
-    print("  cleanup - Complete cleanup (removes all data)")
+    print("  setup           - Check and install dependencies")
+    print("  start           - Start the n8n services")
+    print("  stop            - Stop the n8n services")
+    print("  restart         - Restart the n8n services")
+    print("  status          - Show status of services")
+    print("  logs            - Show logs from services")
+    print("  backup          - Create backup of n8n data")
+    print("  cleanup         - Complete cleanup (removes all data)")
+    print("  validate        - Validate workflow JSON structure")
+    print("  fix-permissions  - Fix Docker permission issues")
+    print("  deploy          - Complete deployment (setup + start)")
+
+def deploy():
+    """Complete deployment process"""
+    print("🚀 Starting complete deployment...")
+    
+    # Setup
+    if not setup():
+        print("❌ Setup failed!")
+        return False
+    
+    # Validate workflow
+    if not validate():
+        print("❌ Workflow validation failed!")
+        return False
+    
+    # Start services
+    if not start():
+        print("❌ Failed to start services!")
+        return False
+    
+    print("🎉 Deployment completed successfully!")
+    print("n8n UI: http://192.168.4.210:5678")
+    print("Import workflow.json into n8n to get started!")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -265,6 +327,12 @@ if __name__ == "__main__":
         backup()
     elif cmd == "cleanup":
         cleanup()
+    elif cmd == "validate":
+        validate()
+    elif cmd == "fix-permissions":
+        fix_permissions()
+    elif cmd == "deploy":
+        deploy()
     else:
         usage()
         sys.exit(1)
